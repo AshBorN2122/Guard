@@ -1,0 +1,645 @@
+&lt;!DOCTYPE html&gt;<br />
+
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>
+NoiseGuard — Smart Noise Pollution Monitoring
+</title>
+<style>  
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap');  
+  
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }  
+  
+  :root {  
+    --bg: #0a0e17;  
+    --surface: #111827;  
+    --surface2: #1a2233;  
+    --border: rgba(255,255,255,0.08);  
+    --accent: #f59e0b;  
+    --red: #ef4444;  
+    --orange: #f97316;  
+    --green: #22c55e;  
+    --blue: #3b82f6;  
+    --cyan: #06b6d4;  
+    --text: #e2e8f0;  
+    --muted: #64748b;  
+    --mono: 'Space Mono', monospace;  
+    --sans: 'DM Sans', sans-serif;  
+  }  
+  
+  body { background: var(--bg); color: var(--text); font-family: var(--sans); min-height: 100vh; }  
+  
+  /* NAV */  
+  nav {  
+    display: flex; align-items: center; justify-content: space-between;  
+    padding: 0 28px; height: 56px;  
+    background: rgba(10,14,23,0.95); border-bottom: 1px solid var(--border);  
+    position: sticky; top: 0; z-index: 100; backdrop-filter: blur(8px);  
+  }  
+  .logo { display: flex; align-items: center; gap: 10px; }  
+  .logo-icon {  
+    width: 32px; height: 32px; background: var(--accent);  
+    border-radius: 6px; display: flex; align-items: center; justify-content: center;  
+    font-size: 16px;  
+  }  
+  .logo-text { font-family: var(--mono); font-size: 15px; font-weight: 700; color: #fff; }  
+  .logo-text span { color: var(--accent); }  
+  .nav-tabs { display: flex; gap: 2px; }  
+  .nav-tab {  
+    padding: 6px 14px; border-radius: 6px; font-size: 13px; cursor: pointer;  
+    color: var(--muted); border: none; background: none; font-family: var(--sans);  
+    transition: all 0.15s;  
+  }  
+  .nav-tab:hover { color: var(--text); background: var(--surface2); }  
+  .nav-tab.active { color: #fff; background: var(--surface2); }  
+  .live-badge {  
+    display: flex; align-items: center; gap: 6px;  
+    font-family: var(--mono); font-size: 12px; color: var(--green);  
+  }  
+  .live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); animation: pulse 1.5s infinite; }  
+  @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.4;} }  
+  
+  /* LAYOUT */  
+  .content { padding: 20px 28px; display: none; }  
+  .content.active { display: block; }  
+  
+  /* STAT CARDS */  
+  .stat-row { display: grid; grid-template-columns: repeat(5,1fr); gap: 12px; margin-bottom: 18px; }  
+  .stat-card {  
+    background: var(--surface); border: 1px solid var(--border);  
+    border-radius: 10px; padding: 14px 16px;  
+  }  
+  .stat-label { font-size: 10px; letter-spacing: 0.08em; color: var(--muted); text-transform: uppercase; margin-bottom: 6px; }  
+  .stat-val { font-family: var(--mono); font-size: 26px; font-weight: 700; }  
+  .stat-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }  
+  .val-green { color: var(--green); }  
+  .val-red { color: var(--red); }  
+  .val-orange { color: var(--orange); }  
+  .val-blue { color: var(--blue); }  
+  .val-cyan { color: var(--cyan); }  
+  
+  /* TWO COLS */  
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }  
+  .three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin-bottom: 14px; }  
+  .card {  
+    background: var(--surface); border: 1px solid var(--border);  
+    border-radius: 10px; padding: 16px;  
+  }  
+  .card-title {  
+    font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;  
+    color: var(--cyan); margin-bottom: 14px; font-family: var(--mono);  
+  }  
+  
+  /* ZONE MAP */  
+  .zone-map { position: relative; height: 240px; background: var(--surface2); border-radius: 8px; overflow: hidden; }  
+  .zone-grid { display: grid; grid-template-columns: repeat(4,1fr); grid-template-rows: repeat(3,1fr); height: 100%; gap: 2px; padding: 2px; }  
+  .zone-cell {  
+    border-radius: 4px; display: flex; flex-direction: column;  
+    align-items: center; justify-content: center; cursor: pointer;  
+    transition: all 0.2s; position: relative; overflow: hidden;  
+  }  
+  .zone-cell:hover { transform: scale(1.03); z-index: 2; }  
+  .zone-cell.safe { background: rgba(34,197,94,0.18); border: 1px solid rgba(34,197,94,0.35); }  
+  .zone-cell.moderate { background: rgba(234,179,8,0.18); border: 1px solid rgba(234,179,8,0.35); }  
+  .zone-cell.high { background: rgba(249,115,22,0.18); border: 1px solid rgba(249,115,22,0.35); }  
+  .zone-cell.critical { background: rgba(239,68,68,0.22); border: 1px solid rgba(239,68,68,0.5); }  
+  .zone-name { font-size: 10px; color: rgba(255,255,255,0.7); margin-bottom: 2px; }  
+  .zone-db { font-family: var(--mono); font-size: 18px; font-weight: 700; }  
+  .zone-cell.safe .zone-db { color: var(--green); }  
+  .zone-cell.moderate .zone-db { color: #eab308; }  
+  .zone-cell.high .zone-db { color: var(--orange); }  
+  .zone-cell.critical .zone-db { color: var(--red); }  
+  .zone-tag { font-size: 9px; color: rgba(255,255,255,0.5); }  
+  
+  /* BAR CHART */  
+  .bar-chart { display: flex; align-items: flex-end; gap: 6px; height: 120px; padding-bottom: 20px; position: relative; }  
+  .bar-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; height: 100%; justify-content: flex-end; }  
+  .bar { width: 100%; border-radius: 4px 4px 0 0; min-height: 4px; transition: all 0.3s; }  
+  .bar-label { font-size: 10px; color: var(--muted); }  
+  .bar-val { font-family: var(--mono); font-size: 10px; color: var(--text); }  
+  
+  /* LINE CHART */  
+  .line-chart-wrap { position: relative; height: 120px; }  
+  svg.line-chart { width: 100%; height: 100%; }  
+  
+  /* ALERT LOG */  
+  .alert-item {  
+    display: flex; align-items: flex-start; gap: 10px;  
+    padding: 10px 0; border-bottom: 1px solid var(--border);  
+  }  
+  .alert-item:last-child { border-bottom: none; }  
+  .alert-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 4px; flex-shrink: 0; }  
+  .alert-dot.critical { background: var(--red); }  
+  .alert-dot.warn { background: var(--orange); }  
+  .alert-dot.info { background: var(--blue); }  
+  .alert-dot.ok { background: var(--green); }  
+  .alert-title { font-size: 13px; color: var(--text); margin-bottom: 2px; }  
+  .alert-sub { font-size: 11px; color: var(--muted); }  
+  .alert-badge {  
+    margin-left: auto; padding: 2px 8px; border-radius: 4px;  
+    font-size: 10px; font-family: var(--mono); flex-shrink: 0;  
+  }  
+  .badge-red { background: rgba(239,68,68,0.15); color: var(--red); border: 1px solid rgba(239,68,68,0.3); }  
+  .badge-orange { background: rgba(249,115,22,0.15); color: var(--orange); border: 1px solid rgba(249,115,22,0.3); }  
+  .badge-blue { background: rgba(59,130,246,0.15); color: var(--blue); border: 1px solid rgba(59,130,246,0.3); }  
+  .badge-green { background: rgba(34,197,94,0.15); color: var(--green); border: 1px solid rgba(34,197,94,0.3); }  
+  
+  /* PIPE STATUS style for sensor list */  
+  .sensor-row {  
+    display: flex; align-items: center; justify-content: space-between;  
+    padding: 10px 12px; border-radius: 6px; margin-bottom: 6px;  
+    background: var(--surface2);  
+  }  
+  .sensor-left { display: flex; align-items: center; gap: 10px; }  
+  .sensor-icon { font-size: 16px; }  
+  .sensor-name { font-size: 13px; color: var(--text); }  
+  .sensor-loc { font-size: 11px; color: var(--muted); }  
+  .sensor-val { font-family: var(--mono); font-size: 14px; font-weight: 700; }  
+  .sensor-status {  
+    padding: 2px 8px; border-radius: 4px; font-size: 10px; font-family: var(--mono);  
+  }  
+  .status-normal { background: rgba(34,197,94,0.15); color: var(--green); }  
+  .status-warn { background: rgba(249,115,22,0.15); color: var(--orange); }  
+  .status-critical { background: rgba(239,68,68,0.15); color: var(--red); }  
+  
+  /* SENSITIVE ZONES */  
+  .sz-item {  
+    display: flex; align-items: center; gap: 12px; padding: 10px;  
+    border-radius: 6px; background: var(--surface2); margin-bottom: 6px;  
+  }  
+  .sz-icon { font-size: 20px; width: 36px; text-align: center; }  
+  .sz-name { font-size: 13px; color: var(--text); }  
+  .sz-type { font-size: 11px; color: var(--muted); }  
+  .sz-db { font-family: var(--mono); font-size: 16px; font-weight: 700; margin-left: auto; }  
+  .sz-limit { font-size: 10px; color: var(--muted); text-align: right; }  
+  
+  /* PROGRESS BAR */  
+  .progress-bar-wrap { margin-bottom: 12px; }  
+  .progress-label { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin-bottom: 5px; }  
+  .progress-track { height: 6px; background: var(--surface2); border-radius: 3px; overflow: hidden; }  
+  .progress-fill { height: 100%; border-radius: 3px; }  
+  
+  /* FORM STYLES */  
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }  
+  .form-group { display: flex; flex-direction: column; gap: 4px; }  
+  label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }  
+  input, select, textarea {  
+    background: var(--surface2); border: 1px solid var(--border); color: var(--text);  
+    padding: 8px 10px; border-radius: 6px; font-size: 13px; font-family: var(--sans);  
+    outline: none;  
+  }  
+  input:focus, select:focus { border-color: var(--cyan); }  
+  .btn {  
+    padding: 8px 18px; border-radius: 6px; font-size: 13px; cursor: pointer;  
+    border: none; font-family: var(--sans); font-weight: 600;  
+  }  
+  .btn-primary { background: var(--cyan); color: #0a0e17; }  
+  .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }  
+  
+  /* CONSERVATION */  
+  .cons-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }  
+  .cons-item {  
+    background: var(--surface2); border-radius: 8px; padding: 12px;  
+    border-left: 3px solid var(--cyan);  
+  }  
+  .cons-num { font-size: 10px; color: var(--cyan); font-family: var(--mono); margin-bottom: 4px; }  
+  .cons-title { font-size: 13px; color: var(--text); font-weight: 500; margin-bottom: 4px; }  
+  .cons-desc { font-size: 11px; color: var(--muted); line-height: 1.5; }  
+  
+  /* SLIDER */  
+  .slider-wrap { background: var(--surface2); padding: 16px; border-radius: 8px; margin-top: 12px; }  
+  .slider-label { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin-bottom: 8px; }  
+  input[type=range] { width: 100%; accent-color: var(--cyan); }  
+  .savings-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 12px; }  
+  .savings-box { background: var(--surface); border-radius: 6px; padding: 10px; text-align: center; }  
+  .savings-val { font-family: var(--mono); font-size: 18px; font-weight: 700; color: var(--cyan); }  
+  .savings-lbl { font-size: 10px; color: var(--muted); margin-top: 2px; }  
+  .total-save { background: var(--surface); border-radius: 6px; padding: 10px 14px; margin-top: 8px; font-family: var(--mono); font-size: 13px; color: var(--green); text-align: center; }  
+</style>
+</head>
+<body>
+<nav>
+<div class="logo">
+<pre><code>&lt;div class=&quot;logo-icon&quot;&gt;🔊&lt;/div&gt;  
+&lt;div class=&quot;logo-text&quot;&gt;Noise&lt;span&gt;Guard&lt;/span&gt;&lt;/div&gt;  </code></pre>
+</div>
+<div class="nav-tabs">
+<pre><code>&lt;button class=&quot;nav-tab active&quot; onclick=&quot;showTab(&#39;dashboard&#39;,this)&quot;&gt;Dashboard&lt;/button&gt;  
+&lt;button class=&quot;nav-tab&quot; onclick=&quot;showTab(&#39;sensors&#39;,this)&quot;&gt;Sensors&lt;/button&gt;  
+&lt;button class=&quot;nav-tab&quot; onclick=&quot;showTab(&#39;zones&#39;,this)&quot;&gt;Sensitive Zones&lt;/button&gt;  
+&lt;button class=&quot;nav-tab&quot; onclick=&quot;showTab(&#39;reports&#39;,this)&quot;&gt;Reports&lt;/button&gt;  
+&lt;button class=&quot;nav-tab&quot; onclick=&quot;showTab(&#39;mitigation&#39;,this)&quot;&gt;Mitigation&lt;/button&gt;  </code></pre>
+</div>
+<div class="live-badge">
+<pre><code>&lt;div class=&quot;live-dot&quot;&gt;&lt;/div&gt;  
+LIVE · &lt;span id=&quot;clock&quot;&gt;00:00:00&lt;/span&gt;  </code></pre>
+</div>
+</nav>
+<!-- DASHBOARD -->
+<div id="tab-dashboard" class="content active">
+<div class="stat-row">
+<pre><code>&lt;div class=&quot;stat-card&quot;&gt;  
+  &lt;div class=&quot;stat-label&quot;&gt;Avg Noise Level&lt;/div&gt;  
+  &lt;div class=&quot;stat-val val-orange&quot;&gt;67.4 &lt;span style=&quot;font-size:14px&quot;&gt;dB&lt;/span&gt;&lt;/div&gt;  
+  &lt;div class=&quot;stat-sub&quot;&gt;City-wide average&lt;/div&gt;  
+&lt;/div&gt;  
+&lt;div class=&quot;stat-card&quot;&gt;  
+  &lt;div class=&quot;stat-label&quot;&gt;Critical Zones&lt;/div&gt;  
+  &lt;div class=&quot;stat-val val-red&quot;&gt;4&lt;/div&gt;  
+  &lt;div class=&quot;stat-sub&quot;&gt;Exceeding WHO limit&lt;/div&gt;  
+&lt;/div&gt;  
+&lt;div class=&quot;stat-card&quot;&gt;  
+  &lt;div class=&quot;stat-label&quot;&gt;Active Alerts&lt;/div&gt;  
+  &lt;div class=&quot;stat-val val-orange&quot;&gt;7&lt;/div&gt;  
+  &lt;div class=&quot;stat-sub&quot;&gt;Require attention&lt;/div&gt;  
+&lt;/div&gt;  
+&lt;div class=&quot;stat-card&quot;&gt;  
+  &lt;div class=&quot;stat-label&quot;&gt;Sensors Online&lt;/div&gt;  
+  &lt;div class=&quot;stat-val val-green&quot;&gt;22/26&lt;/div&gt;  
+  &lt;div class=&quot;stat-sub&quot;&gt;4 offline&lt;/div&gt;  
+&lt;/div&gt;  
+&lt;div class=&quot;stat-card&quot;&gt;  
+  &lt;div class=&quot;stat-label&quot;&gt;Violations Today&lt;/div&gt;  
+  &lt;div class=&quot;stat-val val-red&quot;&gt;12&lt;/div&gt;  
+  &lt;div class=&quot;stat-sub&quot;&gt;Sensitive zone breaches&lt;/div&gt;  
+&lt;/div&gt;  </code></pre>
+</div>
+<div class="two-col">
+<pre><code>&lt;div class=&quot;card&quot;&gt;  
+  &lt;div class=&quot;card-title&quot;&gt;Zone Noise Map (dB)&lt;/div&gt;  
+  &lt;div class=&quot;zone-map&quot;&gt;  
+    &lt;div class=&quot;zone-grid&quot;&gt;  
+      &lt;div class=&quot;zone-cell safe&quot;&gt;&lt;div class=&quot;zone-name&quot;&gt;Park A&lt;/div&gt;&lt;div class=&quot;zone-db&quot;&gt;48&lt;/div&gt;&lt;div class=&quot;zone-tag&quot;&gt;SAFE&lt;/div&gt;&lt;/div&gt;  
+      &lt;div class=&quot;zone-cell moderate&quot;&gt;&lt;div class=&quot;zone-name&quot;&gt;Residential N&lt;/div&gt;&lt;div class=&quot;zone-db&quot;&gt;59&lt;/div&gt;&lt;div class=&quot;zone-tag&quot;&gt;MODERATE&lt;/div&gt;&lt;/div&gt;  
+      &lt;div class=&quot;zone-cell high&quot;&gt;&lt;div class=&quot;zone-name&quot;&gt;Market B&lt;/div&gt;&lt;div class=&quot;zone-db&quot;&gt;74&lt;/div&gt;&lt;div class=&quot;zone-tag&quot;&gt;HIGH&lt;/div&gt;&lt;/div&gt;  
+      &lt;div class=&quot;zone-cell critical&quot;&gt;&lt;div class=&quot;zone-name&quot;&gt;Highway Z1&lt;/div&gt;&lt;div class=&quot;zone-db&quot;&gt;89&lt;/div&gt;&lt;div class=&quot;zone-tag&quot;&gt;CRITICAL&lt;/div&gt;&lt;/div&gt;  
+      &lt;div class=&quot;zone-cell moderate&quot;&gt;&lt;div class=&quot;zone-name&quot;&gt;School S1&lt;/div&gt;&lt;div class=&quot;zone-db&quot;&gt;63&lt;/div&gt;&lt;div class=&quot;zone-tag&quot;&gt;⚠ SCHOOL&lt;/div&gt;&lt;/div&gt;  
+      &lt;div class=&quot;zone-cell high&quot;&gt;&lt;div class=&quot;zone-name&quot;&gt;Industrial E&lt;/div&gt;&lt;div class=&quot;zone-db&quot;&gt;78&lt;/div&gt;&lt;div class=&quot;zone-tag&quot;&gt;HIGH&lt;/div&gt;&lt;/div&gt;  
+      &lt;div class=&quot;zone-cell critical&quot;&gt;&lt;div class=&quot;zone-name&quot;&gt;Junction C4&lt;/div&gt;&lt;div class=&quot;zone-db&quot;&gt;91&lt;/div&gt;&lt;div class=&quot;zone-tag&quot;&gt;CRITICAL&lt;/div&gt;&lt;/div&gt;  
+      &lt;div class=&quot;zone-cell moderate&quot;&gt;&lt;div class=&quot;zone-name&quot;&gt;Residential S&lt;/div&gt;&lt;div class=&quot;zone-db&quot;&gt;57&lt;/div&gt;&lt;div class=&quot;zone-tag&quot;&gt;MODERATE&lt;/div&gt;&lt;/div&gt;  
+      &lt;div class=&quot;zone-cell critical&quot;&gt;&lt;div class=&quot;zone-name&quot;&gt;Hospital H1&lt;/div&gt;&lt;div class=&quot;zone-db&quot;&gt;72&lt;/div&gt;&lt;div class=&quot;zone-tag&quot;&gt;⚠ HOSPITAL&lt;/div&gt;&lt;/div&gt;  
+      &lt;div class=&quot;zone-cell safe&quot;&gt;&lt;div class=&quot;zone-name&quot;&gt;Garden W&lt;/div&gt;&lt;div class=&quot;zone-db&quot;&gt;44&lt;/div&gt;&lt;div class=&quot;zone-tag&quot;&gt;SAFE&lt;/div&gt;&lt;/div&gt;  
+      &lt;div class=&quot;zone-cell high&quot;&gt;&lt;div class=&quot;zone-name&quot;&gt;Rail Yard R&lt;/div&gt;&lt;div class=&quot;zone-db&quot;&gt;82&lt;/div&gt;&lt;div class=&quot;zone-tag&quot;&gt;HIGH&lt;/div&gt;&lt;/div&gt;  
+      &lt;div class=&quot;zone-cell critical&quot;&gt;&lt;div class=&quot;zone-name&quot;&gt;Flyover F2&lt;/div&gt;&lt;div class=&quot;zone-db&quot;&gt;94&lt;/div&gt;&lt;div class=&quot;zone-tag&quot;&gt;CRITICAL&lt;/div&gt;&lt;/div&gt;  
+    &lt;/div&gt;  
+  &lt;/div&gt;  
+&lt;/div&gt;  
+&lt;div class=&quot;card&quot;&gt;  
+  &lt;div class=&quot;card-title&quot;&gt;Recent Alerts&lt;/div&gt;  
+  &lt;div class=&quot;alert-item&quot;&gt;  
+    &lt;div class=&quot;alert-dot critical&quot;&gt;&lt;/div&gt;  
+    &lt;div&gt;  
+      &lt;div class=&quot;alert-title&quot;&gt;Hospital H1 — Noise Breach&lt;/div&gt;  
+      &lt;div class=&quot;alert-sub&quot;&gt;09:14 · Level exceeded 70 dB (limit: 45 dB)&lt;/div&gt;  
+    &lt;/div&gt;  
+    &lt;span class=&quot;alert-badge badge-red&quot;&gt;CRITICAL&lt;/span&gt;  
+  &lt;/div&gt;  
+  &lt;div class=&quot;alert-item&quot;&gt;  
+    &lt;div class=&quot;alert-dot warn&quot;&gt;&lt;/div&gt;  
+    &lt;div&gt;  
+      &lt;div class=&quot;alert-title&quot;&gt;School S1 — Morning Traffic&lt;/div&gt;  
+      &lt;div class=&quot;alert-sub&quot;&gt;08:52 · Noise at 63 dB during school hours&lt;/div&gt;  
+    &lt;/div&gt;  
+    &lt;span class=&quot;alert-badge badge-orange&quot;&gt;WARN&lt;/span&gt;  
+  &lt;/div&gt;  
+  &lt;div class=&quot;alert-item&quot;&gt;  
+    &lt;div class=&quot;alert-dot critical&quot;&gt;&lt;/div&gt;  
+    &lt;div&gt;  
+      &lt;div class=&quot;alert-title&quot;&gt;Junction C4 — Peak Noise&lt;/div&gt;  
+      &lt;div class=&quot;alert-sub&quot;&gt;08:30 · 91 dB sustained over 15 min&lt;/div&gt;  
+    &lt;/div&gt;  
+    &lt;span class=&quot;alert-badge badge-red&quot;&gt;CRITICAL&lt;/span&gt;  
+  &lt;/div&gt;  
+  &lt;div class=&quot;alert-item&quot;&gt;  
+    &lt;div class=&quot;alert-dot info&quot;&gt;&lt;/div&gt;  
+    &lt;div&gt;  
+      &lt;div class=&quot;alert-title&quot;&gt;Sensor S-09 — Offline&lt;/div&gt;  
+      &lt;div class=&quot;alert-sub&quot;&gt;07:45 · Connection lost at North zone&lt;/div&gt;  
+    &lt;/div&gt;  
+    &lt;span class=&quot;alert-badge badge-blue&quot;&gt;INFO&lt;/span&gt;  
+  &lt;/div&gt;  
+  &lt;div class=&quot;alert-item&quot;&gt;  
+    &lt;div class=&quot;alert-dot ok&quot;&gt;&lt;/div&gt;  
+    &lt;div&gt;  
+      &lt;div class=&quot;alert-title&quot;&gt;Park A — Baseline Normal&lt;/div&gt;  
+      &lt;div class=&quot;alert-sub&quot;&gt;06:00 · Daily calibration complete&lt;/div&gt;  
+    &lt;/div&gt;  
+    &lt;span class=&quot;alert-badge badge-green&quot;&gt;OK&lt;/span&gt;  
+  &lt;/div&gt;  
+&lt;/div&gt;  </code></pre>
+</div>
+<div class="two-col">
+<pre><code>&lt;div class=&quot;card&quot;&gt;  
+  &lt;div class=&quot;card-title&quot;&gt;Hourly Avg Noise Today (dB)&lt;/div&gt;  
+  &lt;div class=&quot;bar-chart&quot; id=&quot;hourly-chart&quot;&gt;&lt;/div&gt;  
+&lt;/div&gt;  
+&lt;div class=&quot;card&quot;&gt;  
+  &lt;div class=&quot;card-title&quot;&gt;Zone Noise Comparison (dB)&lt;/div&gt;  
+  &lt;div class=&quot;bar-chart&quot; id=&quot;zone-chart&quot;&gt;&lt;/div&gt;  
+&lt;/div&gt;  </code></pre>
+</div>
+</div>
+<!-- SENSORS -->
+<div id="tab-sensors" class="content">
+<div class="card" style="margin-bottom:14px">
+<pre><code>&lt;div class=&quot;card-title&quot;&gt;Live Sensor Readings&lt;/div&gt;  
+&lt;div id=&quot;sensor-grid&quot; style=&quot;display:grid;grid-template-columns:repeat(3,1fr);gap:8px;&quot;&gt;&lt;/div&gt;  </code></pre>
+</div>
+<div class="card">
+<pre><code>&lt;div class=&quot;card-title&quot;&gt;Add / Edit Sensor&lt;/div&gt;  
+&lt;div class=&quot;form-row&quot;&gt;  
+  &lt;div class=&quot;form-group&quot;&gt;&lt;label&gt;Sensor ID&lt;/label&gt;&lt;input placeholder=&quot;e.g. S-27&quot;&gt;&lt;/div&gt;  
+  &lt;div class=&quot;form-group&quot;&gt;&lt;label&gt;Zone&lt;/label&gt;  
+    &lt;select&gt;&lt;option&gt;North Residential&lt;/option&gt;&lt;option&gt;South Industrial&lt;/option&gt;&lt;option&gt;East Commercial&lt;/option&gt;&lt;option&gt;Hospital Zone&lt;/option&gt;&lt;option&gt;School Zone&lt;/option&gt;&lt;/select&gt;  
+  &lt;/div&gt;  
+&lt;/div&gt;  
+&lt;div class=&quot;form-row&quot;&gt;  
+  &lt;div class=&quot;form-group&quot;&gt;&lt;label&gt;Type&lt;/label&gt;  
+    &lt;select&gt;&lt;option&gt;Acoustic (dB)&lt;/option&gt;&lt;option&gt;Traffic Counter&lt;/option&gt;&lt;option&gt;Vibration&lt;/option&gt;&lt;/select&gt;  
+  &lt;/div&gt;  
+  &lt;div class=&quot;form-group&quot;&gt;&lt;label&gt;Install Date&lt;/label&gt;&lt;input type=&quot;date&quot;&gt;&lt;/div&gt;  
+&lt;/div&gt;  
+&lt;div style=&quot;display:flex;gap:8px;margin-top:4px&quot;&gt;  
+  &lt;button class=&quot;btn btn-primary&quot;&gt;Add Sensor&lt;/button&gt;  
+  &lt;button class=&quot;btn btn-secondary&quot;&gt;Cancel&lt;/button&gt;  
+&lt;/div&gt;  </code></pre>
+</div>
+</div>
+<!-- SENSITIVE ZONES -->
+<div id="tab-zones" class="content">
+<div class="two-col">
+<pre><code>&lt;div class=&quot;card&quot;&gt;  
+  &lt;div class=&quot;card-title&quot;&gt;Sensitive Zone Monitor&lt;/div&gt;  
+  &lt;div class=&quot;sz-item&quot;&gt;  
+    &lt;div class=&quot;sz-icon&quot;&gt;🏥&lt;/div&gt;  
+    &lt;div&gt;&lt;div class=&quot;sz-name&quot;&gt;City Hospital H1&lt;/div&gt;&lt;div class=&quot;sz-type&quot;&gt;Hospital · North Zone&lt;/div&gt;&lt;/div&gt;  
+    &lt;div style=&quot;text-align:right&quot;&gt;&lt;div class=&quot;sz-db val-red&quot;&gt;72 dB&lt;/div&gt;&lt;div class=&quot;sz-limit&quot;&gt;Limit: 45 dB&lt;/div&gt;&lt;/div&gt;  
+  &lt;/div&gt;  
+  &lt;div class=&quot;sz-item&quot;&gt;  
+    &lt;div class=&quot;sz-icon&quot;&gt;🏫&lt;/div&gt;  
+    &lt;div&gt;&lt;div class=&quot;sz-name&quot;&gt;St. Mary&#39;s School&lt;/div&gt;&lt;div class=&quot;sz-type&quot;&gt;School · East Zone&lt;/div&gt;&lt;/div&gt;  
+    &lt;div style=&quot;text-align:right&quot;&gt;&lt;div class=&quot;sz-db val-orange&quot;&gt;63 dB&lt;/div&gt;&lt;div class=&quot;sz-limit&quot;&gt;Limit: 50 dB&lt;/div&gt;&lt;/div&gt;  
+  &lt;/div&gt;  
+  &lt;div class=&quot;sz-item&quot;&gt;  
+    &lt;div class=&quot;sz-icon&quot;&gt;🏛️&lt;/div&gt;  
+    &lt;div&gt;&lt;div class=&quot;sz-name&quot;&gt;District Court&lt;/div&gt;&lt;div class=&quot;sz-type&quot;&gt;Silence Zone · Central&lt;/div&gt;&lt;/div&gt;  
+    &lt;div style=&quot;text-align:right&quot;&gt;&lt;div class=&quot;sz-db val-orange&quot;&gt;61 dB&lt;/div&gt;&lt;div class=&quot;sz-limit&quot;&gt;Limit: 40 dB&lt;/div&gt;&lt;/div&gt;  
+  &lt;/div&gt;  
+  &lt;div class=&quot;sz-item&quot;&gt;  
+    &lt;div class=&quot;sz-icon&quot;&gt;📚&lt;/div&gt;  
+    &lt;div&gt;&lt;div class=&quot;sz-name&quot;&gt;City Library&lt;/div&gt;&lt;div class=&quot;sz-type&quot;&gt;Silence Zone · West&lt;/div&gt;&lt;/div&gt;  
+    &lt;div style=&quot;text-align:right&quot;&gt;&lt;div class=&quot;sz-db&quot; style=&quot;color:#eab308&quot;&gt;54 dB&lt;/div&gt;&lt;div class=&quot;sz-limit&quot;&gt;Limit: 50 dB&lt;/div&gt;&lt;/div&gt;  
+  &lt;/div&gt;  
+  &lt;div class=&quot;sz-item&quot;&gt;  
+    &lt;div class=&quot;sz-icon&quot;&gt;⛪&lt;/div&gt;  
+    &lt;div&gt;&lt;div class=&quot;sz-name&quot;&gt;Central Temple&lt;/div&gt;&lt;div class=&quot;sz-type&quot;&gt;Residential · South&lt;/div&gt;&lt;/div&gt;  
+    &lt;div style=&quot;text-align:right&quot;&gt;&lt;div class=&quot;sz-db val-green&quot;&gt;46 dB&lt;/div&gt;&lt;div class=&quot;sz-limit&quot;&gt;Limit: 55 dB&lt;/div&gt;&lt;/div&gt;  
+  &lt;/div&gt;  
+&lt;/div&gt;  
+&lt;div class=&quot;card&quot;&gt;  
+  &lt;div class=&quot;card-title&quot;&gt;WHO Compliance Status&lt;/div&gt;  
+  &lt;div class=&quot;progress-bar-wrap&quot;&gt;  
+    &lt;div class=&quot;progress-label&quot;&gt;&lt;span&gt;Hospital Zone&lt;/span&gt;&lt;span style=&quot;color:var(--red)&quot;&gt;72/45 dB — CRITICAL&lt;/span&gt;&lt;/div&gt;  
+    &lt;div class=&quot;progress-track&quot;&gt;&lt;div class=&quot;progress-fill&quot; style=&quot;width:100%;background:var(--red)&quot;&gt;&lt;/div&gt;&lt;/div&gt;  
+  &lt;/div&gt;  
+  &lt;div class=&quot;progress-bar-wrap&quot;&gt;  
+    &lt;div class=&quot;progress-label&quot;&gt;&lt;span&gt;School Zone&lt;/span&gt;&lt;span style=&quot;color:var(--orange)&quot;&gt;63/50 dB — HIGH&lt;/span&gt;&lt;/div&gt;  
+    &lt;div class=&quot;progress-track&quot;&gt;&lt;div class=&quot;progress-fill&quot; style=&quot;width:85%;background:var(--orange)&quot;&gt;&lt;/div&gt;&lt;/div&gt;  
+  &lt;/div&gt;  
+  &lt;div class=&quot;progress-bar-wrap&quot;&gt;  
+    &lt;div class=&quot;progress-label&quot;&gt;&lt;span&gt;Silence Zone&lt;/span&gt;&lt;span style=&quot;color:var(--orange)&quot;&gt;61/40 dB — WARN&lt;/span&gt;&lt;/div&gt;  
+    &lt;div class=&quot;progress-track&quot;&gt;&lt;div class=&quot;progress-fill&quot; style=&quot;width:75%;background:var(--orange)&quot;&gt;&lt;/div&gt;&lt;/div&gt;  
+  &lt;/div&gt;  
+  &lt;div class=&quot;progress-bar-wrap&quot;&gt;  
+    &lt;div class=&quot;progress-label&quot;&gt;&lt;span&gt;Residential Night&lt;/span&gt;&lt;span style=&quot;color:#eab308&quot;&gt;54/55 dB — OK&lt;/span&gt;&lt;/div&gt;  
+    &lt;div class=&quot;progress-track&quot;&gt;&lt;div class=&quot;progress-fill&quot; style=&quot;width:55%;background:#eab308&quot;&gt;&lt;/div&gt;&lt;/div&gt;  
+  &lt;/div&gt;  
+  &lt;div class=&quot;progress-bar-wrap&quot;&gt;  
+    &lt;div class=&quot;progress-label&quot;&gt;&lt;span&gt;Commercial Zone&lt;/span&gt;&lt;span style=&quot;color:var(--green)&quot;&gt;46/65 dB — SAFE&lt;/span&gt;&lt;/div&gt;  
+    &lt;div class=&quot;progress-track&quot;&gt;&lt;div class=&quot;progress-fill&quot; style=&quot;width:40%;background:var(--green)&quot;&gt;&lt;/div&gt;&lt;/div&gt;  
+  &lt;/div&gt;  
+  &lt;div style=&quot;margin-top:14px;padding:12px;background:var(--surface2);border-radius:8px;&quot;&gt;  
+    &lt;div style=&quot;font-size:11px;color:var(--muted);margin-bottom:6px;&quot;&gt;Log Noise Complaint&lt;/div&gt;  
+    &lt;div class=&quot;form-row&quot;&gt;  
+      &lt;div class=&quot;form-group&quot;&gt;&lt;label&gt;Location&lt;/label&gt;&lt;input placeholder=&quot;Zone/area&quot;&gt;&lt;/div&gt;  
+      &lt;div class=&quot;form-group&quot;&gt;&lt;label&gt;Severity&lt;/label&gt;&lt;select&gt;&lt;option&gt;Minor&lt;/option&gt;&lt;option&gt;Moderate&lt;/option&gt;&lt;option&gt;Severe&lt;/option&gt;&lt;/select&gt;&lt;/div&gt;  
+    &lt;/div&gt;  
+    &lt;button class=&quot;btn btn-primary&quot; style=&quot;margin-top:4px&quot;&gt;Submit Report&lt;/button&gt;  
+  &lt;/div&gt;  
+&lt;/div&gt;  </code></pre>
+</div>
+</div>
+<!-- REPORTS -->
+<div id="tab-reports" class="content">
+<div class="stat-row">
+<pre><code>&lt;div class=&quot;stat-card&quot;&gt;&lt;div class=&quot;stat-label&quot;&gt;Total Readings&lt;/div&gt;&lt;div class=&quot;stat-val val-cyan&quot;&gt;48,320&lt;/div&gt;&lt;div class=&quot;stat-sub&quot;&gt;This week&lt;/div&gt;&lt;/div&gt;  
+&lt;div class=&quot;stat-card&quot;&gt;&lt;div class=&quot;stat-label&quot;&gt;Violations&lt;/div&gt;&lt;div class=&quot;stat-val val-red&quot;&gt;84&lt;/div&gt;&lt;div class=&quot;stat-sub&quot;&gt;Sensitive zones&lt;/div&gt;&lt;/div&gt;  
+&lt;div class=&quot;stat-card&quot;&gt;&lt;div class=&quot;stat-label&quot;&gt;Avg Reduction&lt;/div&gt;&lt;div class=&quot;stat-val val-green&quot;&gt;6.2 dB&lt;/div&gt;&lt;div class=&quot;stat-sub&quot;&gt;vs last month&lt;/div&gt;&lt;/div&gt;  
+&lt;div class=&quot;stat-card&quot;&gt;&lt;div class=&quot;stat-label&quot;&gt;Peak Hour&lt;/div&gt;&lt;div class=&quot;stat-val val-orange&quot;&gt;8–9 AM&lt;/div&gt;&lt;div class=&quot;stat-sub&quot;&gt;Highest noise window&lt;/div&gt;&lt;/div&gt;  
+&lt;div class=&quot;stat-card&quot;&gt;&lt;div class=&quot;stat-label&quot;&gt;Quietest Zone&lt;/div&gt;&lt;div class=&quot;stat-val val-green&quot;&gt;Park A&lt;/div&gt;&lt;div class=&quot;stat-sub&quot;&gt;44 dB avg&lt;/div&gt;&lt;/div&gt;  </code></pre>
+</div>
+<div class="two-col">
+<pre><code>&lt;div class=&quot;card&quot;&gt;  
+  &lt;div class=&quot;card-title&quot;&gt;Daily Noise Levels — This Week (dB Avg)&lt;/div&gt;  
+  &lt;div class=&quot;bar-chart&quot; id=&quot;weekly-chart&quot;&gt;&lt;/div&gt;  
+&lt;/div&gt;  
+&lt;div class=&quot;card&quot;&gt;  
+  &lt;div class=&quot;card-title&quot;&gt;Noise Source Breakdown&lt;/div&gt;  
+  &lt;div style=&quot;display:flex;flex-direction:column;gap:8px;margin-top:4px&quot;&gt;  
+    &lt;div class=&quot;progress-bar-wrap&quot;&gt;  
+      &lt;div class=&quot;progress-label&quot;&gt;&lt;span&gt;🚗 Road Traffic&lt;/span&gt;&lt;span&gt;52%&lt;/span&gt;&lt;/div&gt;  
+      &lt;div class=&quot;progress-track&quot;&gt;&lt;div class=&quot;progress-fill&quot; style=&quot;width:52%;background:var(--red)&quot;&gt;&lt;/div&gt;&lt;/div&gt;  
+    &lt;/div&gt;  
+    &lt;div class=&quot;progress-bar-wrap&quot;&gt;  
+      &lt;div class=&quot;progress-label&quot;&gt;&lt;span&gt;🏭 Industrial&lt;/span&gt;&lt;span&gt;21%&lt;/span&gt;&lt;/div&gt;  
+      &lt;div class=&quot;progress-track&quot;&gt;&lt;div class=&quot;progress-fill&quot; style=&quot;width:21%;background:var(--orange)&quot;&gt;&lt;/div&gt;&lt;/div&gt;  
+    &lt;/div&gt;  
+    &lt;div class=&quot;progress-bar-wrap&quot;&gt;  
+      &lt;div class=&quot;progress-label&quot;&gt;&lt;span&gt;🚂 Rail/Transit&lt;/span&gt;&lt;span&gt;14%&lt;/span&gt;&lt;/div&gt;  
+      &lt;div class=&quot;progress-track&quot;&gt;&lt;div class=&quot;progress-fill&quot; style=&quot;width:14%;background:#eab308&quot;&gt;&lt;/div&gt;&lt;/div&gt;  
+    &lt;/div&gt;  
+    &lt;div class=&quot;progress-bar-wrap&quot;&gt;  
+      &lt;div class=&quot;progress-label&quot;&gt;&lt;span&gt;🔨 Construction&lt;/span&gt;&lt;span&gt;9%&lt;/span&gt;&lt;/div&gt;  
+      &lt;div class=&quot;progress-track&quot;&gt;&lt;div class=&quot;progress-fill&quot; style=&quot;width:9%;background:var(--blue)&quot;&gt;&lt;/div&gt;&lt;/div&gt;  
+    &lt;/div&gt;  
+    &lt;div class=&quot;progress-bar-wrap&quot;&gt;  
+      &lt;div class=&quot;progress-label&quot;&gt;&lt;span&gt;🎉 Events/Other&lt;/span&gt;&lt;span&gt;4%&lt;/span&gt;&lt;/div&gt;  
+      &lt;div class=&quot;progress-track&quot;&gt;&lt;div class=&quot;progress-fill&quot; style=&quot;width:4%;background:var(--cyan)&quot;&gt;&lt;/div&gt;&lt;/div&gt;  
+    &lt;/div&gt;  
+  &lt;/div&gt;  
+&lt;/div&gt;  </code></pre>
+</div>
+<div class="card">
+<pre><code>&lt;div class=&quot;card-title&quot;&gt;Generate Custom Report&lt;/div&gt;  
+&lt;div class=&quot;form-row&quot;&gt;  
+  &lt;div class=&quot;form-group&quot;&gt;&lt;label&gt;From Date&lt;/label&gt;&lt;input type=&quot;date&quot;&gt;&lt;/div&gt;  
+  &lt;div class=&quot;form-group&quot;&gt;&lt;label&gt;To Date&lt;/label&gt;&lt;input type=&quot;date&quot;&gt;&lt;/div&gt;  
+  &lt;div class=&quot;form-group&quot;&gt;&lt;label&gt;Zone Filter&lt;/label&gt;&lt;select&gt;&lt;option&gt;All Zones&lt;/option&gt;&lt;option&gt;Sensitive Zones&lt;/option&gt;&lt;option&gt;Hospital&lt;/option&gt;&lt;option&gt;School&lt;/option&gt;&lt;/select&gt;&lt;/div&gt;  
+  &lt;div class=&quot;form-group&quot;&gt;&lt;label&gt;Format&lt;/label&gt;&lt;select&gt;&lt;option&gt;PDF Report&lt;/option&gt;&lt;option&gt;CSV Export&lt;/option&gt;&lt;option&gt;Dashboard View&lt;/option&gt;&lt;/select&gt;&lt;/div&gt;  
+&lt;/div&gt;  
+&lt;button class=&quot;btn btn-primary&quot;&gt;Generate Report&lt;/button&gt;  </code></pre>
+</div>
+</div>
+<!-- MITIGATION -->
+<div id="tab-mitigation" class="content">
+<div class="card" style="margin-bottom:14px">
+<pre><code>&lt;div class=&quot;card-title&quot;&gt;Noise Mitigation Strategies&lt;/div&gt;  
+&lt;div class=&quot;cons-grid&quot;&gt;  
+  &lt;div class=&quot;cons-item&quot;&gt;  
+    &lt;div class=&quot;cons-num&quot;&gt;01&lt;/div&gt;  
+    &lt;div class=&quot;cons-title&quot;&gt;Night-Time Traffic Control&lt;/div&gt;  
+    &lt;div class=&quot;cons-desc&quot;&gt;Restrict heavy vehicles near hospitals and schools between 10 PM–6 AM. Any sustained noise above 55 dB triggers automated alerts.&lt;/div&gt;  
+  &lt;/div&gt;  
+  &lt;div class=&quot;cons-item&quot;&gt;  
+    &lt;div class=&quot;cons-num&quot;&gt;02&lt;/div&gt;  
+    &lt;div class=&quot;cons-title&quot;&gt;Acoustic Barrier Monitoring&lt;/div&gt;  
+    &lt;div class=&quot;cons-desc&quot;&gt;Track effectiveness of noise barriers. Sensors before and after barriers measure noise reduction in real-time.&lt;/div&gt;  
+  &lt;/div&gt;  
+  &lt;div class=&quot;cons-item&quot;&gt;  
+    &lt;div class=&quot;cons-num&quot;&gt;03&lt;/div&gt;  
+    &lt;div class=&quot;cons-title&quot;&gt;Zone Isolation Testing&lt;/div&gt;  
+    &lt;div class=&quot;cons-desc&quot;&gt;Identify dominant noise corridors by temporarily redirecting traffic and monitoring dB drops per zone.&lt;/div&gt;  
+  &lt;/div&gt;  
+  &lt;div class=&quot;cons-item&quot;&gt;  
+    &lt;div class=&quot;cons-num&quot;&gt;04&lt;/div&gt;  
+    &lt;div class=&quot;cons-title&quot;&gt;Construction Hour Enforcement&lt;/div&gt;  
+    &lt;div class=&quot;cons-desc&quot;&gt;Flag construction activity exceeding 70 dB in residential zones between 7–8 PM or on Sundays using acoustic event detection.&lt;/div&gt;  
+  &lt;/div&gt;  
+  &lt;div class=&quot;cons-item&quot;&gt;  
+    &lt;div class=&quot;cons-num&quot;&gt;05&lt;/div&gt;  
+    &lt;div class=&quot;cons-title&quot;&gt;Smart Traffic Signal Sync&lt;/div&gt;  
+    &lt;div class=&quot;cons-desc&quot;&gt;Coordinate traffic lights near sensitive zones to reduce engine idling and horn usage at peak congestion windows.&lt;/div&gt;  
+  &lt;/div&gt;  
+  &lt;div class=&quot;cons-item&quot;&gt;  
+    &lt;div class=&quot;cons-num&quot;&gt;06&lt;/div&gt;  
+    &lt;div class=&quot;cons-title&quot;&gt;Green Buffer Mapping&lt;/div&gt;  
+    &lt;div class=&quot;cons-desc&quot;&gt;Identify zones where tree-belt or green wall planting can reduce ambient noise by 3–8 dB based on sensor data.&lt;/div&gt;  
+  &lt;/div&gt;  
+  &lt;div class=&quot;cons-item&quot;&gt;  
+    &lt;div class=&quot;cons-num&quot;&gt;07&lt;/div&gt;  
+    &lt;div class=&quot;cons-title&quot;&gt;Industrial Shift Scheduling&lt;/div&gt;  
+    &lt;div class=&quot;cons-desc&quot;&gt;Track noise spikes from factories by shift and recommend off-peak scheduling for high-noise processes near residential zones.&lt;/div&gt;  
+  &lt;/div&gt;  
+  &lt;div class=&quot;cons-item&quot;&gt;  
+    &lt;div class=&quot;cons-num&quot;&gt;08&lt;/div&gt;  
+    &lt;div class=&quot;cons-title&quot;&gt;Seasonal Pattern Analysis&lt;/div&gt;  
+    &lt;div class=&quot;cons-desc&quot;&gt;Monitor seasonal noise changes (monsoon traffic, festival spikes) and update zone limits proactively with historical ML models.&lt;/div&gt;  
+  &lt;/div&gt;  
+&lt;/div&gt;  </code></pre>
+</div>
+<div class="card">
+<pre><code>&lt;div class=&quot;card-title&quot;&gt;Estimate Noise Reduction Potential&lt;/div&gt;  
+&lt;div class=&quot;slider-wrap&quot;&gt;  
+  &lt;div class=&quot;slider-label&quot;&gt;&lt;span&gt;Current Peak dB in Zone&lt;/span&gt;&lt;span id=&quot;dbl-val&quot; style=&quot;color:var(--cyan);font-family:var(--mono)&quot;&gt;80 dB&lt;/span&gt;&lt;/div&gt;  
+  &lt;input type=&quot;range&quot; min=&quot;50&quot; max=&quot;100&quot; value=&quot;80&quot; id=&quot;dbl-slider&quot; oninput=&quot;updateSavings(this.value)&quot;&gt;  
+  &lt;div class=&quot;savings-row&quot;&gt;  
+    &lt;div class=&quot;savings-box&quot;&gt;&lt;div class=&quot;savings-val&quot; id=&quot;s1&quot;&gt;4 dB&lt;/div&gt;&lt;div class=&quot;savings-lbl&quot;&gt;Traffic Control&lt;/div&gt;&lt;/div&gt;  
+    &lt;div class=&quot;savings-box&quot;&gt;&lt;div class=&quot;savings-val&quot; id=&quot;s2&quot;&gt;6 dB&lt;/div&gt;&lt;div class=&quot;savings-lbl&quot;&gt;Acoustic Barriers&lt;/div&gt;&lt;/div&gt;  
+    &lt;div class=&quot;savings-box&quot;&gt;&lt;div class=&quot;savings-val&quot; id=&quot;s3&quot;&gt;3 dB&lt;/div&gt;&lt;div class=&quot;savings-lbl&quot;&gt;Green Buffers&lt;/div&gt;&lt;/div&gt;  
+  &lt;/div&gt;  
+  &lt;div class=&quot;total-save&quot; id=&quot;total-save&quot;&gt;Total potential reduction: 13 dB (−16.3%) → Expected: 67 dB&lt;/div&gt;  
+&lt;/div&gt;  </code></pre>
+</div>
+</div>
+<script>  
+// Clock  
+function updateClock() {  
+  const now = new Date();  
+  document.getElementById('clock').textContent =  
+    now.toTimeString().slice(0,8);  
+}  
+setInterval(updateClock, 1000); updateClock();  
+  
+// Tab switch  
+function showTab(id, btn) {  
+  document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));  
+  document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('active'));  
+  document.getElementById('tab-' + id).classList.add('active');  
+  btn.classList.add('active');  
+}  
+  
+// Hourly chart  
+const hourlyData = [32,29,38,45,62,74,82,78,71,68,65,70,74,72,68,65,67,71,76,78,72,65,55,44];  
+const hourlyChart = document.getElementById('hourly-chart');  
+hourlyData.forEach((v, i) => {  
+  if(i % 3 !== 0) return;  
+  const wrap = document.createElement('div'); wrap.className = 'bar-wrap';  
+  const bar = document.createElement('div'); bar.className = 'bar';  
+  bar.style.height = (v/100*100) + '%';  
+  bar.style.background = v > 75 ? 'var(--red)' : v > 60 ? 'var(--orange)' : 'var(--green)';  
+  const lbl = document.createElement('div'); lbl.className = 'bar-label'; lbl.textContent = i + 'h';  
+  const val = document.createElement('div'); val.className = 'bar-val'; val.textContent = v;  
+  wrap.append(bar, val, lbl); hourlyChart.appendChild(wrap);  
+});  
+  
+// Zone chart  
+const zoneData = [{n:'Park A',v:48},{n:'Res N',v:59},{n:'Market',v:74},{n:'Hwy Z1',v:89},{n:'School',v:63},{n:'Ind E',v:78},{n:'Junc C4',v:91},{n:'Hosp H1',v:72}];  
+const zoneChart = document.getElementById('zone-chart');  
+zoneData.forEach(z => {  
+  const wrap = document.createElement('div'); wrap.className = 'bar-wrap';  
+  const bar = document.createElement('div'); bar.className = 'bar';  
+  bar.style.height = (z.v/100*100) + '%';  
+  bar.style.background = z.v > 75 ? 'var(--red)' : z.v > 60 ? 'var(--orange)' : 'var(--green)';  
+  const lbl = document.createElement('div'); lbl.className = 'bar-label'; lbl.style.fontSize = '9px'; lbl.textContent = z.n;  
+  const val = document.createElement('div'); val.className = 'bar-val'; val.textContent = z.v;  
+  wrap.append(bar, val, lbl); zoneChart.appendChild(wrap);  
+});  
+  
+// Weekly chart  
+const weeklyData = [{n:'Mon',v:68},{n:'Tue',v:71},{n:'Wed',v:69},{n:'Thu',v:73},{n:'Fri',v:76},{n:'Sat',v:62},{n:'Sun',v:55}];  
+const weeklyChart = document.getElementById('weekly-chart');  
+weeklyData.forEach(d => {  
+  const wrap = document.createElement('div'); wrap.className = 'bar-wrap';  
+  const bar = document.createElement('div'); bar.className = 'bar';  
+  bar.style.height = (d.v/100*100) + '%';  
+  bar.style.background = d.v > 72 ? 'var(--orange)' : 'var(--blue)';  
+  const lbl = document.createElement('div'); lbl.className = 'bar-label'; lbl.textContent = d.n;  
+  const val = document.createElement('div'); val.className = 'bar-val'; val.textContent = d.v;  
+  wrap.append(bar, val, lbl); weeklyChart.appendChild(wrap);  
+});  
+  
+// Sensor grid  
+const sensors = [  
+  {id:'S-01',zone:'North',type:'🔊',val:'99 L/min',status:'CRITICAL',sc:'critical'},  
+  {id:'S-02',zone:'North',type:'📡',val:'4.7 bar',status:'NORMAL',sc:'normal'},  
+  {id:'S-03',zone:'East',type:'🔊',val:'54 dB',status:'NORMAL',sc:'normal'},  
+  {id:'S-04',zone:'East',type:'📡',val:'2.9 bar',status:'WARN',sc:'warn'},  
+  {id:'S-05',zone:'South',type:'🔊',val:'129 dB',status:'CRITICAL',sc:'critical'},  
+  {id:'S-06',zone:'South',type:'📡',val:'4.4 bar',status:'NORMAL',sc:'normal'},  
+  {id:'S-07',zone:'West',type:'🔊',val:'61 dB',status:'NORMAL',sc:'normal'},  
+  {id:'S-08',zone:'West',type:'🌡️',val:'22°C',status:'NORMAL',sc:'normal'},  
+  {id:'S-09',zone:'North',type:'⚠️',val:'OFFLINE',status:'OFFLINE',sc:'warn'},  
+];  
+const sgrid = document.getElementById('sensor-grid');  
+sensors.forEach(s => {  
+  const card = document.createElement('div');  
+  card.style.cssText = 'background:var(--surface2);border-radius:8px;padding:12px;';  
+  card.innerHTML = `  
+    <div style="display:flex;justify-content:space-between;align-items:flex-start">  
+      <div style="font-size:10px;color:var(--muted);font-family:var(--mono)">${s.id} · ${s.zone}</div>  
+      <span class="sensor-status status-${s.sc}" style="font-size:9px">${s.status}</span>  
+    </div>  
+    <div style="font-family:var(--mono);font-size:22px;font-weight:700;margin:8px 0;color:${s.sc==='critical'?'var(--red)':s.sc==='warn'?'var(--orange)':'var(--cyan)'}">${s.val}</div>  
+    <div style="font-size:11px;color:var(--muted)">${s.type} ${s.type.includes('🔊')?'Acoustic Sensor':'Pressure Sensor'}</div>  
+  `;  
+  sgrid.appendChild(card);  
+});  
+  
+// Savings slider  
+function updateSavings(v) {  
+  v = parseInt(v);  
+  document.getElementById('dbl-val').textContent = v + ' dB';  
+  const t = Math.round(v * 0.05), b = Math.round(v * 0.075), g = Math.round(v * 0.038);  
+  document.getElementById('s1').textContent = t + ' dB';  
+  document.getElementById('s2').textContent = b + ' dB';  
+  document.getElementById('s3').textContent = g + ' dB';  
+  const total = t + b + g;  
+  const pct = (total / v * 100).toFixed(1);  
+  const after = v - total;  
+  document.getElementById('total-save').textContent = `Total potential reduction: ${total} dB (−${pct}%) → Expected: ${after} dB`;  
+}  
+</script>
+</body>
+</html>
